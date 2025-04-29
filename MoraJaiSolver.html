@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mora Jai Solver</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        text-align: center;
+        margin-top: 20px;
+      }
+      .board-container {
+        display: inline-block;
+        position: relative;
+      }
+      .board {
+        display: grid;
+        grid-template-columns: 20px repeat(3, 60px);
+        gap: 5px;
+      }
+      .tile {
+        width: 60px;
+        height: 60px;
+        border: 1px solid #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        user-select: none;
+      }
+      .row-label {
+        width: 20px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+      }
+      .col-labels {
+        display: grid;
+        grid-template-columns: 20px repeat(3, 60px);
+        gap: 5px;
+        margin-bottom: 5px;
+      }
+      .col-label {
+        width: 60px;
+        text-align: center;
+        font-weight: bold;
+      }
+      button {
+        margin: 5px;
+        padding: 5px 10px;
+      }
+      textarea {
+        width: 200px;
+        height: 100px;
+        margin-top: 10px;
+      }
+      #goalColorBox {
+        width: 60px;
+        height: 60px;
+        margin: 10px auto;
+        border: 2px solid black;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        user-select: none;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Mora Jai Solver</h1>
+
+    <div class="board-container">
+      <div class="col-labels">
+        <div></div>
+        <div class="col-label">A</div>
+        <div class="col-label">B</div>
+        <div class="col-label">C</div>
+      </div>
+      <div class="board" id="board"></div>
+    </div>
+
+    <div>
+      <button onclick="resetBoard()">Reset</button>
+      <button onclick="solve()">Solve</button>
+      <button onclick="toggleSimulate()">Toggle Simulate</button>
+    </div>
+
+    <h3>Goal Color</h3>
+    <div
+      id="goalColorBox"
+      onclick="cycleGoalColor(1)"
+      oncontextmenu="cycleGoalColor(-1); return false;"
+    ></div>
+
+    <textarea id="boardInput" placeholder="Paste board here..."></textarea
+    ><br />
+    <button onclick="loadBoard()">Load Board</button>
+
+    <p id="solution"></p>
+
+    <script>
+      const colors = [
+        "gray",
+        "black",
+        "red",
+        "green",
+        "yellow",
+        "pink",
+        "purple",
+        "orange",
+        "white",
+        "blue",
+      ];
+      let board = Array.from({ length: 3 }, () => Array(3).fill("gray"));
+      let simulateMode = false;
+      let goalColor = "red";
+
+      const boardDiv = document.getElementById("board");
+      const goalColorBox = document.getElementById("goalColorBox");
+
+      function renderBoard() {
+        boardDiv.innerHTML = "";
+        for (let y = 0; y < 3; y++) {
+          const rowLabel = document.createElement("div");
+          rowLabel.className = "row-label";
+          rowLabel.textContent = y + 1;
+          boardDiv.appendChild(rowLabel);
+
+          for (let x = 0; x < 3; x++) {
+            const tile = document.createElement("div");
+            tile.className = "tile";
+            tile.style.background = board[y][x];
+            tile.textContent = board[y][x][0].toUpperCase();
+            tile.oncontextmenu = (e) => {
+              e.preventDefault();
+              const idx = colors.indexOf(board[y][x]);
+              board[y][x] = colors[(idx - 1 + colors.length) % colors.length];
+              renderBoard();
+            };
+            tile.onclick = () => {
+              if (simulateMode) {
+                board = applyTileEffect(board, x, y);
+              } else {
+                const idx = colors.indexOf(board[y][x]);
+                board[y][x] = colors[(idx + 1) % colors.length];
+              }
+              renderBoard();
+            };
+            boardDiv.appendChild(tile);
+          }
+        }
+        goalColorBox.style.background = goalColor;
+        goalColorBox.textContent = goalColor[0].toUpperCase();
+      }
+
+      function resetBoard() {
+        board = Array.from({ length: 3 }, () => Array(3).fill("gray"));
+        renderBoard();
+        document.getElementById("solution").textContent = "";
+      }
+
+      function toggleSimulate() {
+        simulateMode = !simulateMode;
+        alert("Simulate mode is now " + (simulateMode ? "ON" : "OFF"));
+      }
+
+      function loadBoard() {
+        const input = document.getElementById("boardInput").value.trim();
+        const lines = input.split("\n").map((line) => line.trim().split(/\s+/));
+        if (lines.length !== 3 || lines.some((row) => row.length !== 3)) {
+          alert("Invalid board format! Must be 3 rows with 3 colors each.");
+          return;
+        }
+        board = lines;
+        renderBoard();
+      }
+
+      function deepCopy(board) {
+        return board.map((row) => [...row]);
+      }
+
+      function boardsEqual(b1, b2) {
+        return b1.every((row, i) => row.every((cell, j) => cell === b2[i][j]));
+      }
+
+      function isGoalState(board) {
+        return (
+          board[0][0] === goalColor &&
+          board[0][2] === goalColor &&
+          board[2][0] === goalColor &&
+          board[2][2] === goalColor
+        );
+      }
+
+      function applyTileEffect(board, x, y) {
+        const newBoard = deepCopy(board);
+        const type = board[y][x];
+        const inBounds = (i, j) => i >= 0 && i < 3 && j >= 0 && j < 3;
+        const adjacents = [
+          [y - 1, x],
+          [y + 1, x],
+          [y, x - 1],
+          [y, x + 1],
+        ];
+
+        if (type === "gray") return newBoard;
+
+        switch (type) {
+          case "black":
+            newBoard[y] = [board[y][2], board[y][0], board[y][1]];
+            break;
+          case "red":
+            for (let i = 0; i < 3; i++) {
+              for (let j = 0; j < 3; j++) {
+                if (board[i][j] === "white") newBoard[i][j] = "black";
+                else if (board[i][j] === "black") newBoard[i][j] = "red";
+              }
+            }
+            break;
+          case "green": {
+            const oppY = 2 - y,
+              oppX = 2 - x;
+            [newBoard[y][x], newBoard[oppY][oppX]] = [
+              newBoard[oppY][oppX],
+              newBoard[y][x],
+            ];
+            break;
+          }
+          case "yellow":
+            if (y > 0)
+              [newBoard[y][x], newBoard[y - 1][x]] = [
+                newBoard[y - 1][x],
+                newBoard[y][x],
+              ];
+            break;
+          case "purple":
+            if (y < 2)
+              [newBoard[y][x], newBoard[y + 1][x]] = [
+                newBoard[y + 1][x],
+                newBoard[y][x],
+              ];
+            break;
+          case "orange": {
+            const counts = {};
+            let maxCount = 0,
+              majority = null;
+            for (let [i, j] of adjacents) {
+              if (inBounds(i, j)) {
+                const color = board[i][j];
+                counts[color] = (counts[color] || 0) + 1;
+                if (counts[color] > maxCount) {
+                  maxCount = counts[color];
+                  majority = color;
+                }
+              }
+            }
+            const majorityCount = Object.values(counts).filter(
+              (v) => v === maxCount
+            ).length;
+            if (majorityCount === 1) newBoard[y][x] = majority;
+            break;
+          }
+          case "white": {
+            for (let [i, j] of adjacents) {
+              if (inBounds(i, j) && board[i][j] === "gray") {
+                newBoard[i][j] = "white";
+              } else if (inBounds(i, j) && board[i][j] === "white") {
+                newBoard[i][j] = "gray";
+              }
+            }
+            newBoard[y][x] = "gray";
+            break;
+          }
+          case "pink": {
+            const order = [
+              [-1, 0],
+              [0, 1],
+              [1, 0],
+              [0, -1],
+            ];
+            const tiles = [];
+            for (let [dy, dx] of order) {
+              const ny = y + dy,
+                nx = x + dx;
+              if (inBounds(ny, nx)) tiles.push([ny, nx]);
+            }
+            const rotated = tiles.map(
+              (_, i) => newBoard[tiles[(i + 3) % 4][0]][tiles[(i + 3) % 4][1]]
+            );
+            tiles.forEach(([ny, nx], i) => (newBoard[ny][nx] = rotated[i]));
+            break;
+          }
+          case "blue":
+            return applyTileEffect(newBoard, 1, 1);
+        }
+        return newBoard;
+      }
+
+      function bfs(initialBoard) {
+        const queue = [{ board: deepCopy(initialBoard), path: [] }];
+        const visited = new Set();
+
+        function serialize(board) {
+          return board.flat().join(",");
+        }
+
+        while (queue.length > 0) {
+          const { board, path } = queue.shift();
+          const key = serialize(board);
+          if (visited.has(key)) continue;
+          visited.add(key);
+
+          if (path.length > 30) continue;
+          if (isGoalState(board)) return path;
+
+          for (let y = 0; y < 3; y++) {
+            for (let x = 0; x < 3; x++) {
+              if (board[y][x] === "gray") continue;
+              const newBoard = applyTileEffect(board, x, y);
+              if (!boardsEqual(board, newBoard)) {
+                queue.push({ board: newBoard, path: [...path, [x, y]] });
+              }
+            }
+          }
+        }
+        return null;
+      }
+
+      function posToChessNotation(x, y) {
+        const letters = ["A", "B", "C"];
+        return letters[x] + (y + 1);
+      }
+
+      function solve() {
+        const path = bfs(board);
+        if (path) {
+          document.getElementById("solution").textContent =
+            "Click tiles in order: " +
+            path.map(([x, y]) => posToChessNotation(x, y)).join(", ");
+        } else {
+          document.getElementById("solution").textContent =
+            "No solution found within 30 moves.";
+        }
+      }
+
+      function cycleGoalColor(dir) {
+        const idx = colors.indexOf(goalColor);
+        goalColor = colors[(idx + dir + colors.length) % colors.length];
+        renderBoard();
+      }
+
+      renderBoard();
+    </script>
+  </body>
+</html>
