@@ -170,7 +170,10 @@
 
       function loadBoard() {
         const input = document.getElementById("boardInput").value.trim();
-        const lines = input.split("\n").map((line) => line.trim().split(/\s+/));
+        const lines = input
+          .replace(/grey/g, "gray")
+          .split("\n")
+          .map((line) => line.trim().split(/\s+/));
         if (lines.length !== 3 || lines.some((row) => row.length !== 3)) {
           alert("Invalid board format! Must be 3 rows with 3 colors each.");
           return;
@@ -276,22 +279,28 @@
             break;
           }
           case "pink": {
-            const order = [
-              [-1, 0],
-              [0, 1],
-              [1, 0],
-              [0, -1],
+            const adjacents = [
+              [y - 1, x - 1],
+              [y - 1, x],
+              [y - 1, x + 1],
+              [y, x + 1],
+              [y + 1, x + 1],
+              [y + 1, x],
+              [y + 1, x - 1],
+              [y, x - 1],
+            ].filter(([i, j]) => inBounds(i, j));
+            // Get colors at adjacent positions
+            const adjacentColors = adjacents.map(([i, j]) => board[i][j]);
+            // Rotate adjacent colors clockwise by 1 position
+            const rotatedColors = [
+              adjacentColors[adjacentColors.length - 1],
+              ...adjacentColors.slice(0, -1),
             ];
-            const tiles = [];
-            for (let [dy, dx] of order) {
-              const ny = y + dy,
-                nx = x + dx;
-              if (inBounds(ny, nx)) tiles.push([ny, nx]);
+            // Apply rotated colors back to the board
+            for (let i = 0; i < adjacents.length; i++) {
+              const [adjY, adjX] = adjacents[i];
+              newBoard[adjY][adjX] = rotatedColors[i];
             }
-            const rotated = tiles.map(
-              (_, i) => newBoard[tiles[(i + 3) % 4][0]][tiles[(i + 3) % 4][1]]
-            );
-            tiles.forEach(([ny, nx], i) => (newBoard[ny][nx] = rotated[i]));
             break;
           }
           case "blue":
